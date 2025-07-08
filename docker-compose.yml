@@ -1,0 +1,173 @@
+###############################################################################
+#                               NETWORKS                                      #
+###############################################################################
+networks:
+  infra:
+    name: "infra"
+    driver: bridge
+    # external: true
+
+###############################################################################
+#                               VOLUMES                                       #
+###############################################################################
+volumes:
+  registry_data:
+    name: "registry_data"
+    # external: true
+  portainer_data:
+    name: "portainer_data"
+    # external: true
+  postgres_data:
+    name: "postgres_data"
+    # external: true
+  # loki_data:
+  #   driver: local
+  # grafana_data:
+  #   driver: local
+  # prometheus_data:
+  #   driver: local
+
+###############################################################################
+#                               SERVICES                                      #
+###############################################################################
+services:
+
+  #############################################################################
+  #                      Docker Registry (Secured)                            #
+  #############################################################################
+  registry:
+    image: registry:2
+    container_name: registry
+    networks:
+      - infra
+    environment:
+      # Configure basic auth with htpasswd
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin: '[https://${REGISTRY_UI}]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods: '[HEAD,GET,OPTIONS,DELETE]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials: '[true]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers: '[Authorization,Accept,Cache-Control]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers: '[Docker-Content-Digest]'
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+    volumes:
+      - registry_data:/var/lib/registry
+      - ./auth:/auth  # mount htpasswd file into container
+    restart: unless-stopped
+
+  #############################################################################
+  #                          Docker Registry UI                               #
+  #############################################################################
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    container_name: registry-ui
+    networks:
+      - infra
+    depends_on:
+      - registry
+    environment:
+      - REGISTRY_TITLE="Private Docker Registry"
+      - REGISTRY_URL=https://${REGISTRY_URL}
+      - REGISTRY_USER=${REGISTRY_USER}
+      - REGISTRY_PASS=${REGISTRY_PASS}
+      # If you want the UI to handle authentication too (optional):
+      - REGISTRY_AUTH=htpasswd
+      # You can embed the credentials in the URL or rely on the UI's prompt
+      - REGISTRY_AUTH_URL=https://${REGISTRY_USER}:${REGISTRY_PASS}@${REGISTRY_URL}
+    restart: unless-stopped
+
+  #############################################################################
+  #                          Cloudflare Tunnel                                #
+  #############################################################################
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    networks:
+      - infra
+    # Example passing TUNNEL_TOKEN via environment. We read from .env
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    command: tunnel run
+    restart: unless-stopped
+    #############################################################################
+  #                              PostgreSQL Database                           #
+  #############################################################################
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    networks:
+      - infra
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # - ./pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
+    ports:
+      - "5434:5432"
+    restart: unless-stopped
+
+  #############################################################################
+  #                               Portainer                                  #
+  #############################################################################
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    networks:
+      - infra
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: unless-stopped
+
+  #############################################################################
+  #                                 Grafana                                   #
+  #############################################################################
+  # grafana:
+  #   image: grafana/otel-lgtm:latest
+  #   container_name: grafana
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3000:3000'
+  #     - '4317:4317'
+  #     - '4318:4318'
+  #     - '3100:3100'
+  #   networks:
+  #     - infra
+  #   volumes:
+  #     - loki_data:/loki
+  #     - grafana_data:/var/lib/grafana
+  #     - prometheus_data:/prometheus
+
+  #############################################################################
+  #                                 Keycloak                                  #
+  #############################################################################
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: ${KC_HOSTNAME}
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: true
+      KC_HTTP_ENABLED: true
+      KC_PROXY_HEADERS: xforwarded
+      # KC_PROXY_PROTOCOL_ENABLED: true
+      # KC_PROXY: edge
+      KC_PROXY_TRUSTED_ADDRESSES: 127.0.0.0/8
+    command:
+      - start
+    ports:
+      - "9080:8080"
+      - "8443:8443"
+    depends_on:
+      - postgres
+    networks:
+      - infra
+    restart: unless-stopped

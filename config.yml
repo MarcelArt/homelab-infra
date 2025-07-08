@@ -1,0 +1,7 @@
+tunnel: e75c6ba4-3fc5-4c84-a0ab-be257ecb5c21  # Replace with your actual tunnel ID
+credentials-file: /etc/cloudflared/e75c6ba4-3fc5-4c84-a0ab-be257ecb5c21.json  # Replace with your actual credentials file
+
+ingress:
+  - hostname: pg.apta.works  # Replace with your desired hostname
+    service: tcp://postgres:5432
+  - service: http_status:404 
