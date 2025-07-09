@@ -1,4 +1,4 @@
-# Infrastructure Devops Apta
+# Infrastructure Devops
 
 ## Setup 
 Create htpasswd file with this command
