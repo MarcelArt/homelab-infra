@@ -54,7 +54,7 @@ services:
     volumes:
       - registry_data:/var/lib/registry
       - ./auth:/auth  # mount htpasswd file into container
-    restart: unless-stopped
+    restart: no
 
   #############################################################################
   #                          Docker Registry UI                               #
@@ -75,7 +75,7 @@ services:
       - REGISTRY_AUTH=htpasswd
       # You can embed the credentials in the URL or rely on the UI's prompt
       - REGISTRY_AUTH_URL=https://${REGISTRY_USER}:${REGISTRY_PASS}@${REGISTRY_URL}
-    restart: unless-stopped
+    restart: no
 
   #############################################################################
   #                          Cloudflare Tunnel                                #
@@ -89,7 +89,7 @@ services:
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     command: tunnel run
-    restart: unless-stopped
+    restart: no
     #############################################################################
   #                              PostgreSQL Database                           #
   #############################################################################
@@ -106,7 +106,7 @@ services:
       # - ./pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf
     ports:
       - "5434:5432"
-    restart: unless-stopped
+    restart: no
 
   #############################################################################
   #                               Portainer                                  #
@@ -119,7 +119,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
-    restart: unless-stopped
+    restart: no
 
   #############################################################################
   #                                 Grafana                                   #
@@ -127,7 +127,7 @@ services:
   # grafana:
   #   image: grafana/otel-lgtm:latest
   #   container_name: grafana
-  #   restart: unless-stopped
+  #   restart: no
   #   ports:
   #     - '3000:3000'
   #     - '4317:4317'
@@ -170,4 +170,4 @@ services:
       - postgres
     networks:
       - infra
-    restart: unless-stopped
+    restart: no
